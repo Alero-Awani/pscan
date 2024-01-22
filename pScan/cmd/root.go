@@ -4,10 +4,17 @@ Copyright © 2024 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
+	"fmt"
 	"os"
+	"strings"
 
+	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
+
+var cfgFile string
+
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -33,13 +40,24 @@ func Execute() {
 }
 
 func init() {
-	// cobra.OnInitialize(initConfig)
+	cobra.OnInitialize(initConfig)
 	// Here you will define your flags and configuration settings.
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
 
-	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.pScan.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.cobra.yaml)")
 	rootCmd.PersistentFlags().StringP("host-file", "f", "pScan.hosts", "pscan hosts file")
+
+
+	//bind the configuration with the hosts-file flag and allow the user to 
+	//specify it as an envirnment variable
+
+	replacer := strings.NewReplacer("-", "_")
+	viper.SetEnvKeyReplacer(replacer)
+	viper.SetEnvPrefix("PSCAN")
+
+	viper.BindPFlag("host-file", rootCmd.PersistentFlags().Lookup("host-file"))
+	// viper.BindEnv("host-file", "PSCAN_HOSTS_FILE")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
@@ -49,3 +67,26 @@ func init() {
 }
 
 
+func initConfig() {
+	if cfgFile != "" {
+		// use config file from the flag 
+		viper.SetConfigFile(cfgFile)
+	} else {
+		// Find the home directory
+		home, err := homedir.Dir()
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		// Search config in home directory with name ".pScan" (without extension).
+		viper.AddConfigPath(home)
+		viper.SetConfigName(".cobra")
+	}
+
+	viper.AutomaticEnv() // read in environment variables that match
+
+	//If a config file is found, read it in 
+	if err := viper.ReadInConfig(); err == nil {
+		fmt.Println("Using config file:", viper.ConfigFileUsed())
+	}
+}

@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"pragprog.com/rggo/cobra/pScan/scan"
 )
 
@@ -19,10 +20,11 @@ var deleteCmd = &cobra.Command{
 	Short: "Delete hosts(s) from list",
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		hostsFile, err := cmd.Flags().GetString("host-file")
-		if err != nil {
-			return err
-		}
+		// hostsFile, err := cmd.Flags().GetString("host-file")
+		// if err != nil {
+		// 	return err
+		// }
+		hostsFile := viper.GetString("host-file")
 		return deleteAction(os.Stdout, hostsFile, args)
 	},
 }
