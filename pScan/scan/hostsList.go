@@ -22,7 +22,7 @@ type HostsList struct {
 
 }
 
-// search searches for hopsts in the list //note for searchstring, if the result is not present, it returns the lenght
+// search searches for hosts in the list //note for searchstring, if the result is not present, it returns the lenght
 func (hl *HostsList) search(host string) (bool, int) {
 	sort.Strings(hl.Hosts)
 

@@ -36,64 +36,54 @@ var scanCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		
+
+		isSet := cmd.Flags().Changed("ports")
+		isSetrange := cmd.Flags().Changed("rports")
+	
 
 		// check if the user set the port or rport then decide what to return 
 
-		return scanAction(cmd *cobra.Command,os.Stdout, hostsFile, ports, rports)
+		return scanAction(os.Stdout, hostsFile, ports, rports, isSet, isSetrange)
 
 	},
 }
 
-
-
-//scanAction function takes an io.Writer interface represnting where to print the output to 
-//hostsFile contains the name of the file to load the hosts list from 
-//and slice of integer ports representing the ports to scan 
-
-
-func scanAction(cmd *cobra.Command, out io.Writer, hostsFile string, ports []int, rports string) error {
-	//create instance of HostsList type from scan package
+func scanAction(out io.Writer, hostsFile string, ports []int, portRange string, isSet, isSetrange bool) error {
 	hl := &scan.HostsList{}
-
-	//load content of the hostsFile into the hosts list instance 
 	if err := hl.Load(hostsFile); err != nil {
 		return err
 	}
+	
 
 	//disable ability to pass both ports and portRange
-	//this function wont work because rport and port are never empty because of the defaults 
-	// //but it works with empty defaults 
-	// if (len(ports) > 3) && (rports != "") {
-	// 	flagErr := errors.New("error: Specify either ports or portRange and not both")
-	// 	fmt.Println(ports)
-	// 	fmt.Println(rports)
-	// 	return flagErr
-	// }
-
-	// define result variable 
-	var results []scan.Results 
-
-	// if cmd.Flags().Changed("rports") {
-	// 	fmt.Println("The 'myflag' flag was changed by the user.")
-	// } else {
-	// 	fmt.Println("The 'myflag' flag was not changed.")
-	// }
-
-	if cmd.Flags().Changed("ports") {
-		results = scan.Run(hl, ports)
+	if isSet && isSetrange {
+		flagErr := errors.New("error: Specify either ports or portRange and not both")
+		return flagErr
 	}
-	
-	//if portRange is provided loop through it and populate ports
-	if cmd.Flags().Changed("rports") {
-		portInt := strings.Split(rports, "-")
 
-		start, err := strconv.Atoi(portInt[0])
+	var results []scan.Results
+
+	//print out the default values for port flag if no flag is set 
+	if !isSet && !isSetrange {
+		results = scan.Run(hl, ports)
+		return printResults(out, results)
+	}
+
+	//port flag
+	if isSet {
+		results = scan.Run(hl, ports)
+		return printResults(out, results)
+	}
+
+	//if portRange is provided loop through it and populate ports
+	if !isSet && isSetrange {
+		portStr := strings.Split(portRange, "-")
+		start, err := strconv.Atoi(portStr[0])
 		if err != nil {
 			fmt.Println("Error converting start:", err)
 			return err
 		}
-		end, err := strconv.Atoi(portInt[1])
+		end, err := strconv.Atoi(portStr[1])
 		if err != nil {
 			fmt.Println("Error converting end:", err)
 			return err
@@ -104,24 +94,23 @@ func scanAction(cmd *cobra.Command, out io.Writer, hostsFile string, ports []int
 				rangeports = append(rangeports, i)
 			}
 			results = scan.Run(hl, rangeports)
+
 		} else {
 			flagErr := errors.New("error: port range should be between 1-65535 | upper port number must be greater than lower port number")
 			return flagErr
 		}
-		
 	}
 
 
-	// results := scan.Run(hl, ports)
+	
 	return printResults(out, results)
 }
-
 
 
 //PrintResults prints the results out, takes in io.Writer and slice of scan.Results as input and returns an error 
 
 func printResults(out io.Writer, results []scan.Results) error {
-	//compose the ouput message
+	//compose the output message
 	message := ""
 
 	//loop through all the results in the result slice, add the host name and 
@@ -171,3 +160,6 @@ func init() {
 	// is called directly, e.g.:
 	// scanCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
+
+
+
