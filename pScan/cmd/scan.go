@@ -148,6 +148,8 @@ func init() {
 	//multiple port scan input 
 	scanCmd.Flags().String("rports", "1-15", "Scan a range of ports")
 
+	//filter Open and Closed ports 
+
 
 
 	// Here you will define your flags and configuration settings.
