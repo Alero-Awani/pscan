@@ -1,6 +1,9 @@
 package scan_test
 
 import (
+	"errors"
+	"io/ioutil"
+	"os"
 	"testing"
 
 	"pragprog.com/rggo/cobra/pScan/scan"
@@ -20,12 +23,12 @@ func TestAdd(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T)){
+		t.Run(tc.name, func(t *testing.T){
 			hl := &scan.HostsList{}
 
 			//Initialize list //this adding host 1 to the list so that we can check later if 
 			//the code works well to check for existing hosts  
-			if err := hl.Add("host1")err != nil {				
+			if err := hl.Add("host1"); err != nil {				
 				t.Fatal(err)
 			}
 
@@ -73,7 +76,7 @@ func TestAdd(t *testing.T) {
 				t.Errorf("Expected host name %q as index 1, got %q instead\n",
 				tc.host, hl.Hosts[1])
 			}
-		}
+		})
 	}
 
 }
@@ -102,7 +105,7 @@ func TestRemove(t *testing.T) {
 
 	}
 
-	for _, tc := rnage testCases {
+	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			hl := &scan.HostsList{}
 
@@ -116,7 +119,7 @@ func TestRemove(t *testing.T) {
 			err := hl.Remove(tc.host)
 
 			//Checking for RemoveNotFound (if the expected error in the struct is not nil but you got nil)
-			if tc.expectErr != nil {
+			if tc.expectedErr != nil {
 				if err == nil {
 					t.Fatalf("Expected error, got nil instead\n")
 				}
@@ -124,23 +127,23 @@ func TestRemove(t *testing.T) {
 				//check for the kind of error it returned 
 				if ! errors.Is(err, tc.expectedErr) {
 					t.Errorf("Expected err %q, got %q instead\n",
-					tc.expectErr, err)
+					tc.expectedErr, err)
 				}
 				return // ends the program and moves on to the next iteration
 			}
 
 			// Check for RemoveExisting
 			if err != nil {
-				t.Fatalf("Expected no error, got %q instead\n" err)
+				t.Fatalf("Expected no error, got %q instead\n", err)
 			} 
 
 			
-			//Fatal doesnt terminate the program so we move on to the other test cases that depend on it 
+			//Fatal doesnt terminate the program because it passed so we move on to the other test cases that depend on it 
 			// if th lenght of the list is not equal to the expected len after removing the host 
 
-			if len(hl.Hosts) != tc.expectLen {
+			if len(hl.Hosts) != tc.expectedLen {
 				t.Errorf("Expected list length %d, got %d instead\n",
-				tc.expectLen, len(hl.Hosts))
+				tc.expectedLen, len(hl.Hosts))
 			}
 
 			//check if it eas actually removed 
@@ -152,9 +155,63 @@ func TestRemove(t *testing.T) {
 }
 
 
-// Create test function to tes Save and Load methods 
+// Create test function to test Save and Load methods 
 // function creates two HostsList instances, initializes the first list and uses the Save()
 // method to save it to temp file 
 // then it  uses the load method to load the contents of the temporary file into the second lis t
 //then it compares both lists 
 // The test fails if the contents of the list dont match
+// We are not using table driven testing for this, why?
+
+func TestSaveLoad(t *testing.T){
+	hl1 := scan.HostsList{}
+	hl2 := scan.HostsList{}
+
+
+	hostName := "host1"
+
+	hl1.Add(hostName)
+
+	tf, err := ioutil.TempFile("","")
+
+	if err != nil {
+		t.Fatalf("Error creating temp file: %s", err)
+	}
+	defer os.Remove(tf.Name())
+
+	if err := hl1.Save(tf.Name()); err != nil {
+		t.Fatalf("Error saving list from file: %s", err)
+	}
+
+	if err := hl2.Load(tf.Name()); err != nil {
+		t.Fatalf("Error getting list from file: %s", err)
+	}
+
+	if hl1.Hosts[0] != hl2.Hosts[0] {
+		t.Errorf("Host %q should match %q host", hl1.Hosts[0], hl2.Hosts[0])
+	}
+
+}
+
+//test case for scenario where Load() method attempts to load a file that doesnt exist 
+
+func TestLoadNoFile(t *testing.T) {
+	tf, err := ioutil.TempFile("", "")
+
+	if err != nil {
+		t.Fatalf("Error creating temp file: %s", err)
+	}
+
+	//delete the temp file 
+	if err := os.Remove(tf.Name()); err != nil {
+		t.Fatalf("Error deleting temp file: %s", err)
+	}
+
+	hl := &scan.HostsList{}
+
+	if err := hl.Load(tf.Name()); err != nil {
+		t.Errorf("Expected no error, got %q instead\n", err )
+	}
+}
+
+
