@@ -57,7 +57,6 @@ type Results struct {
 //The function takes in a pointer to the HostList type 
 //and a slice of integers representing the ports to scan. It returns a slice of Results 
 
-
 func Run(hl *HostsList, ports []int) []Results {
 	res := make([]Results, 0, len(hl.Hosts))
 

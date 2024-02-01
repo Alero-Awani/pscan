@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -16,105 +17,101 @@ import (
 	"pragprog.com/rggo/cobra/pScan/scan"
 )
 
+var flagErr = errors.New("Put in correct value for ports, should be in format '1-15', '22,33' or single port '22'")
+
 // scanCmd represents the scan command
 var scanCmd = &cobra.Command{
 	Use:   "scan",
 	Short: "Run a port scan on the hosts",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// hostsFile, err := cmd.Flags().GetString("host-file")
-		// if err != nil {
-		// 	return err
-		// }
+		
 		hostsFile := viper.GetString("host-file")
 
-		ports, err := cmd.Flags().GetIntSlice("ports")
+		ports, err := cmd.Flags().GetString("ports")
 		if err != nil {
 			return err
 		}
 
-		rports, err := cmd.Flags().GetString("rports")
+		portSlice, err := portAction(ports)
 		if err != nil {
 			return err
 		}
 
-		isSet := cmd.Flags().Changed("ports")
-		isSetrange := cmd.Flags().Changed("rports")
-	
-
-		// check if the user set the port or rport then decide what to return 
-
-		return scanAction(os.Stdout, hostsFile, ports, rports, isSet, isSetrange)
+		return scanAction(os.Stdout, hostsFile, portSlice)
 
 	},
 }
 
-func scanAction(out io.Writer, hostsFile string, ports []int, portRange string, isSet, isSetrange bool) error {
-	hl := &scan.HostsList{}
-	if err := hl.Load(hostsFile); err != nil {
-		return err
-	}
-	
+func portAction(ports string) ([]int, error) {
 
-	//disable ability to pass both ports and portRange
-	if isSet && isSetrange {
-		flagErr := errors.New("error: Specify either ports or portRange and not both")
-		return flagErr
-	}
+	// if person passes just one num , it should be converted to int and stored in the list 
 
-	var results []scan.Results
+	comma_match, _ := regexp.MatchString(`\d,\d`, ports)
+	dash_match, _ := regexp.MatchString(`\d-\d`, ports)
+	num_match, _ := regexp.MatchString(`\d`, ports)
 
-	//print out the default values for port flag if no flag is set 
-	if !isSet && !isSetrange {
-		results = scan.Run(hl, ports)
-		return printResults(out, results)
-	}
+	rangeports := []int{}
 
-	//port flag
-	if isSet {
-		results = scan.Run(hl, ports)
-		return printResults(out, results)
-	}
-
-	//if portRange is provided loop through it and populate ports
-	if !isSet && isSetrange {
-		portStr := strings.Split(portRange, "-")
+	if dash_match {
+		portStr := strings.Split(ports, "-")
 		start, err := strconv.Atoi(portStr[0])
 		if err != nil {
 			fmt.Println("Error converting start:", err)
-			return err
+			return nil ,err
 		}
 		end, err := strconv.Atoi(portStr[1])
 		if err != nil {
 			fmt.Println("Error converting end:", err)
-			return err
+			return nil, err
 		}
 		if (start >= 1 && end <= 65535) && (end > start) {
-			rangeports := []int{}
 			for i := start; i <= end; i++ {
 				rangeports = append(rangeports, i)
 			}
-			results = scan.Run(hl, rangeports)
 
 		} else {
-			flagErr := errors.New("error: port range should be between 1-65535 | upper port number must be greater than lower port number")
-			return flagErr
+			portErr := errors.New("port range should be between 1-65535 | upper port number must be greater than lower port number")
+			return nil, portErr 
 		}
+	} else if comma_match {
+		portStr := strings.Split(ports, ",")
+		for _, i := range portStr {
+			j, err := strconv.Atoi(i)
+			if err != nil {
+				fmt.Println("Error converting string to integer")
+			}
+			rangeports = append(rangeports, j)
+		}
+
+	} else if num_match {
+		num, err := strconv.Atoi(ports)
+		if err != nil {
+			return nil, flagErr
+		}
+		rangeports = append(rangeports, num)
+	} else {
+		return nil, flagErr
 	}
 
+	return rangeports, nil
+}
 
-	
+
+func scanAction(out io.Writer, hostsFile string, portSlice []int) error {
+	hl := &scan.HostsList{}
+	if err := hl.Load(hostsFile); err != nil {
+		return err
+	}
+
+	results := scan.Run(hl, portSlice)
 	return printResults(out, results)
 }
 
 
-//PrintResults prints the results out, takes in io.Writer and slice of scan.Results as input and returns an error 
 
 func printResults(out io.Writer, results []scan.Results) error {
 	//compose the output message
 	message := ""
-
-	//loop through all the results in the result slice, add the host name and 
-	//the list of ports with each status to the message variable.
 
 	for _, r := range results {
 		message += fmt.Sprintf("%s:", r.Host)
@@ -133,7 +130,6 @@ func printResults(out io.Writer, results []scan.Results) error {
 		message += fmt.Sprintln()
 	}
 
-	//print the contents of message to io.Writer and return the error
 	_, err := fmt.Fprint(out, message)
 	return err
 }
@@ -143,14 +139,7 @@ func printResults(out io.Writer, results []scan.Results) error {
 func init() {
 	rootCmd.AddCommand(scanCmd)
 
-	scanCmd.Flags().IntSliceP("ports", "p", []int{22,33,44}, "ports to scan")
-	
-	//multiple port scan input 
-	scanCmd.Flags().String("rports", "1-15", "Scan a range of ports")
-
-	//filter Open and Closed ports 
-
-
+	scanCmd.Flags().StringP("ports", "p", "", "Scan ports")
 
 	// Here you will define your flags and configuration settings.
 
