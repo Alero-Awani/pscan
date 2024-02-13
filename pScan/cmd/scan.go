@@ -32,7 +32,6 @@ var scanCmd = &cobra.Command{
 			return err
 		}
 
-		// issue, we want to pass filter to print results without having to pass it through
 		filter, err := cmd.Flags().GetString("filter")
 		if err != nil {
 			return err
@@ -43,7 +42,7 @@ var scanCmd = &cobra.Command{
 			return err
 		}
         
-		return scanAction(os.Stdout, hostsFile, portSlice, &filter)
+		return scanAction(os.Stdout, hostsFile, portSlice, filter)
 
 	},
 }
@@ -103,7 +102,7 @@ func portAction(ports string) ([]int, error) {
 }
 
 
-func scanAction(out io.Writer, hostsFile string, portSlice []int, filter *string) error {
+func scanAction(out io.Writer, hostsFile string, portSlice []int, filter string) error {
 	hl := &scan.HostsList{}
 
 	if err := hl.Load(hostsFile); err != nil {
@@ -112,7 +111,7 @@ func scanAction(out io.Writer, hostsFile string, portSlice []int, filter *string
 
 	results := scan.Run(hl, portSlice)
  
-	return printResults(out, results, *filter)
+	return printResults(out, results, filter)
 }
 
 
@@ -133,7 +132,7 @@ func printResults(out io.Writer, results []scan.Results, filter string) error {
 		message += fmt.Sprintln()
 
 		for _, p := range r.PortStates {
-			if (*&filter == "open" && p.Open) || (*&filter == "closed" && !p.Open) || (filter == "") {
+			if (filter == "open" && p.Open) || (filter == "closed" && !p.Open) || (filter == "") {
 				message += fmt.Sprintf("\t%d: %s\n", p.Port, p.Open)
 			}
 		}
