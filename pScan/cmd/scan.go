@@ -32,7 +32,6 @@ var scanCmd = &cobra.Command{
 			return err
 		}
 
-		// issue, we want to pass filter to print results without having to pass it through
 		filter, err := cmd.Flags().GetString("filter")
 		if err != nil {
 			return err
@@ -51,7 +50,6 @@ var scanCmd = &cobra.Command{
 
 func portAction(ports string) ([]int, error) {
 
-	// if person passes just one num , it should be converted to int and stored in the list 
 
 	comma_match, _ := regexp.MatchString(`\d,\d`, ports)
 	dash_match, _ := regexp.MatchString(`\d-\d`, ports)
@@ -117,7 +115,6 @@ func scanAction(out io.Writer, hostsFile string, portSlice []int) error {
 }
 
 
-// we will add it in printresult, hardcoding filter
 
 func printResults(out io.Writer, results []scan.Results) error {
 	//compose the output message
