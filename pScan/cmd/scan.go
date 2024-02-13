@@ -18,7 +18,7 @@ import (
 )
 
 var flagErr = errors.New("Put in correct value for ports, should be in format '1-15', '22,33' or single port '22'")
-var filterList []string 
+
 // scanCmd represents the scan command
 var scanCmd = &cobra.Command{
 	Use:   "scan",
@@ -32,24 +32,25 @@ var scanCmd = &cobra.Command{
 			return err
 		}
 
+		// issue, we want to pass filter to print results without having to pass it through
 		filter, err := cmd.Flags().GetString("filter")
 		if err != nil {
 			return err
 		}
-		filterList = append(filterList, filter)
 
 		portSlice, err := portAction(ports)
 		if err != nil {
 			return err
 		}
         
-		return scanAction(os.Stdout, hostsFile, portSlice)
+		return scanAction(os.Stdout, hostsFile, portSlice, &filter)
 
 	},
 }
 
 func portAction(ports string) ([]int, error) {
 
+	// if person passes just one num , it should be converted to int and stored in the list 
 
 	comma_match, _ := regexp.MatchString(`\d,\d`, ports)
 	dash_match, _ := regexp.MatchString(`\d-\d`, ports)
@@ -102,7 +103,7 @@ func portAction(ports string) ([]int, error) {
 }
 
 
-func scanAction(out io.Writer, hostsFile string, portSlice []int) error {
+func scanAction(out io.Writer, hostsFile string, portSlice []int, filter *string) error {
 	hl := &scan.HostsList{}
 
 	if err := hl.Load(hostsFile); err != nil {
@@ -111,12 +112,13 @@ func scanAction(out io.Writer, hostsFile string, portSlice []int) error {
 
 	results := scan.Run(hl, portSlice)
  
-	return printResults(out, results)
+	return printResults(out, results, *filter)
 }
 
 
+// we will add it in printresult, hardcoding filter
 
-func printResults(out io.Writer, results []scan.Results) error {
+func printResults(out io.Writer, results []scan.Results, filter string) error {
 	//compose the output message
 	message := ""
 
@@ -131,7 +133,7 @@ func printResults(out io.Writer, results []scan.Results) error {
 		message += fmt.Sprintln()
 
 		for _, p := range r.PortStates {
-			if (filterList[0] == "open" && p.Open) || (filterList[0] == "closed" && !p.Open) || (filterList[0] == "") {
+			if (*&filter == "open" && p.Open) || (*&filter == "closed" && !p.Open) || (filter == "") {
 				message += fmt.Sprintf("\t%d: %s\n", p.Port, p.Open)
 			}
 		}
