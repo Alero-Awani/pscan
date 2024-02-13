@@ -18,13 +18,13 @@ import (
 )
 
 var flagErr = errors.New("Put in correct value for ports, should be in format '1-15', '22,33' or single port '22'")
-
+var filterList []string 
 // scanCmd represents the scan command
 var scanCmd = &cobra.Command{
 	Use:   "scan",
 	Short: "Run a port scan on the hosts",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		
+
 		hostsFile := viper.GetString("host-file")
 
 		ports, err := cmd.Flags().GetString("ports")
@@ -32,11 +32,18 @@ var scanCmd = &cobra.Command{
 			return err
 		}
 
+		// issue, we want to pass filter to print results without having to pass it through
+		filter, err := cmd.Flags().GetString("filter")
+		if err != nil {
+			return err
+		}
+		filterList = append(filterList, filter)
+
 		portSlice, err := portAction(ports)
 		if err != nil {
 			return err
 		}
-
+        
 		return scanAction(os.Stdout, hostsFile, portSlice)
 
 	},
@@ -99,15 +106,18 @@ func portAction(ports string) ([]int, error) {
 
 func scanAction(out io.Writer, hostsFile string, portSlice []int) error {
 	hl := &scan.HostsList{}
+
 	if err := hl.Load(hostsFile); err != nil {
 		return err
 	}
 
 	results := scan.Run(hl, portSlice)
+ 
 	return printResults(out, results)
 }
 
 
+// we will add it in printresult, hardcoding filter
 
 func printResults(out io.Writer, results []scan.Results) error {
 	//compose the output message
@@ -124,22 +134,25 @@ func printResults(out io.Writer, results []scan.Results) error {
 		message += fmt.Sprintln()
 
 		for _, p := range r.PortStates {
-			message += fmt.Sprintf("\t%d: %s\n", p.Port, p.Open)
+			if (filterList[0] == "open" && p.Open) || (filterList[0] == "closed" && !p.Open) || (filterList[0] == "") {
+				message += fmt.Sprintf("\t%d: %s\n", p.Port, p.Open)
+			}
 		}
 
 		message += fmt.Sprintln()
+
 	}
 
 	_, err := fmt.Fprint(out, message)
 	return err
 }
 
-
-//add a local flag --ports to allow user specify a slice of ports to be scanned
+// add a local flag --ports to allow user specify a slice of ports to be scanned
 func init() {
 	rootCmd.AddCommand(scanCmd)
 
 	scanCmd.Flags().StringP("ports", "p", "", "Scan ports")
+	scanCmd.Flags().String("filter", "", "Show either open or closed ports")
 
 	// Here you will define your flags and configuration settings.
 
@@ -151,6 +164,3 @@ func init() {
 	// is called directly, e.g.:
 	// scanCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
-
-
-
